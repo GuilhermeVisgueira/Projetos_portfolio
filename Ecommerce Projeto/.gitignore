@@ -1,0 +1,19 @@
+# KDE / OS metadata
+.directory
+.DS_Store
+
+# Java / Spring Boot / Maven
+target/
+*.jar
+*.war
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# .NET / C# Blazor
+bin/
+obj/
+.vs/
+
+# Secrets / Env
+.env
+*.local

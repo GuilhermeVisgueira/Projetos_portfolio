@@ -1,0 +1,11 @@
+# Ambiente de container para a API Java (Spring Boot)
+FROM docker.io/library/eclipse-temurin:21-jdk-alpine
+
+WORKDIR /app
+
+# Porta padrão do Spring Boot
+EXPOSE 8080
+
+# Enquanto o código da API ainda não foi criado, mantém o ambiente ativo em standby.
+# Quando o projeto Spring Boot existir em /app, executará ./mvnw spring-boot:run
+CMD ["sh", "-c", "if [ -f ./mvnw ]; then ./mvnw spring-boot:run; else echo 'Ambiente Java 21 (ecommerce-api) pronto e aguardando criação das APIs...'; tail -f /dev/null; fi"]

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: docker.io/library/mongo:7.0
+    container_name: ecommerce-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init/init-replica.js:/docker-entrypoint-initdb.d/init-replica.js:ro
+    command: [ "mongod", "--replSet", "rs0", "--bind_ip_all" ]
+    networks:
+      - ecommerce-net
+
+  api:
+    image: docker.io/library/eclipse-temurin:21-jdk-alpine
+    container_name: ecommerce-api
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://ecommerce-mongodb:27017/ecommerce?replicaSet=rs0
+      SERVER_PORT: 8080
+    volumes:
+      - ../backend:/app:Z
+    command: >
+      sh -c "if [ -f ./mvnw ]; then ./mvnw spring-boot:run;
+      else echo 'Ambiente Java 21 pronto aguardando codigo da API...'; tail -f /dev/null; fi"
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-net
+
+networks:
+  ecommerce-net:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local

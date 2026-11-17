@@ -132,6 +132,7 @@ dbEcommerce.users.insertMany([
     },
     passwordHash: "$2a$10$ExemploDeHashBCryptParaDesenvolvimento1234567890",
     role: "ADMIN",
+    emailVerified: true,
     createdAt: new Date()
   },
   {
@@ -152,6 +153,30 @@ dbEcommerce.users.insertMany([
     },
     passwordHash: "$2a$10$ExemploDeHashBCryptParaClienteMaria9876543210",
     role: "CUSTOMER",
+    emailVerified: true,
+    createdAt: new Date()
+  },
+  {
+    name: "Carlos Vendedor",
+    email: "carlos.vendedor@exemplo.com",
+    cpf: "456.789.123-22",
+    birthDate: new Date("1992-03-10T00:00:00Z"),
+    phone: "+55 31 97766-5544",
+    address: {
+      street: "Avenida Afonso Pena",
+      number: "1500",
+      complement: "Loja 12",
+      neighborhood: "Centro",
+      city: "Belo Horizonte",
+      state: "MG",
+      zipCode: "30130-005",
+      country: "Brasil"
+    },
+    passwordHash: "$2a$10$ExemploDeHashBCryptParaVendedorCarlos1122334455",
+    role: "SELLER",
+    storeName: "Tech & Café Store",
+    cnpj: "12.345.678/0001-99",
+    emailVerified: true,
     createdAt: new Date()
   }
 ]);

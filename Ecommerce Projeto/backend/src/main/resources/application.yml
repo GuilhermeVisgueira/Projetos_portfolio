@@ -1,0 +1,49 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: ecommerce-api
+
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI:mongodb://localhost:27017/ecommerce?replicaSet=rs0&directConnection=true}
+      auto-index-creation: true
+
+  # Configuração para verificação de e-mail e notificações (Mailpit local na porta 1025 ou SMTP real)
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:noreply@ecommerce.local}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:ChaveSecretaDesenvolvimentoEcommercePortfolio2026ComMaisDe256Bits!}
+      expiration-ms: ${JWT_EXPIRATION_MS:3600000} # 1 hora
+    email-verification:
+      expiration-minutes: 30
+      base-url: ${APP_BASE_URL:http://localhost:8080/api/v1/auth/verify-email}
+  stripe:
+    # Se STRIPE_API_KEY começar com sk_test_ ou sk_live_, usa a API real da Stripe.
+    # Caso contrário, opera em modo simulado seguro para testes locais imediatos.
+    api-key: ${STRIPE_API_KEY:sk_test_mock_local_dev}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_test_local_secret_2026}
+    success-url: ${STRIPE_SUCCESS_URL:http://localhost:5000/checkout/success?session_id={CHECKOUT_SESSION_ID}}
+    cancel-url: ${STRIPE_CANCEL_URL:http://localhost:5000/checkout/cancel}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

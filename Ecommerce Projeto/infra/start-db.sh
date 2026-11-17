@@ -10,6 +10,7 @@ MONGO_VOLUME="ecommerce_mongodb_data"
 MONGO_IMAGE="docker.io/library/mongo:7.0"
 
 API_CONTAINER="ecommerce-api"
+API_MAVEN_VOLUME="ecommerce_maven_repo"
 API_IMAGE="docker.io/library/eclipse-temurin:21-jdk-alpine"
 
 # 0. Garantir rede isolada no Podman para comunicação entre MongoDB e API Java
@@ -18,10 +19,13 @@ if ! podman network exists "$NETWORK_NAME"; then
   podman network create "$NETWORK_NAME"
 fi
 
-# 1. Garantir volume persistente do MongoDB
+# 1. Garantir volumes persistentes (MongoDB + cache Maven)
 if ! podman volume exists "$MONGO_VOLUME"; then
   echo "[1/5] Criando volume '$MONGO_VOLUME'..."
   podman volume create "$MONGO_VOLUME"
+fi
+if ! podman volume exists "$API_MAVEN_VOLUME"; then
+  podman volume create "$API_MAVEN_VOLUME" >/dev/null
 fi
 
 # 2. Criar ou iniciar o container do MongoDB (conectado na rede ecommerce-net)
@@ -67,29 +71,42 @@ for i in {1..15}; do
   sleep 1
 done
 
-# 4. Popular/Atualizar banco 'ecommerce'
-echo "[4/5] Garantindo estrutura e dados do banco 'ecommerce'..."
-podman exec -i "$MONGO_CONTAINER" mongosh --quiet < "$SCRIPT_DIR/mongo-init/seed-ecommerce.js"
-
-# 5. Criar ou iniciar o container de ambiente da API Java (sem criar o código da API ainda)
-mkdir -p "$PROJECT_DIR/backend"
-if podman container exists "$API_CONTAINER"; then
-  echo "[5/5] Garantindo que o container da API ('$API_CONTAINER') está em execução..."
-  podman start "$API_CONTAINER" >/dev/null
+# 4. Popular/Atualizar banco 'ecommerce' (apenas se ainda estiver vazio)
+echo "[4/5] Verificando estrutura e dados do banco 'ecommerce'..."
+PRODUCTS_COUNT=$(podman exec "$MONGO_CONTAINER" mongosh --quiet ecommerce --eval "db.products.countDocuments()" 2>/dev/null || echo "0")
+if [ "$PRODUCTS_COUNT" = "0" ]; then
+  podman exec -i "$MONGO_CONTAINER" mongosh --quiet < "$SCRIPT_DIR/mongo-init/seed-ecommerce.js"
 else
-  echo "[5/5] Criando e iniciando container '$API_CONTAINER' (Java 21) na porta 8080..."
-  podman run -d \
-    --name "$API_CONTAINER" \
-    --network "$NETWORK_NAME" \
-    -p 8080:8080 \
-    -w /app \
-    -e SPRING_DATA_MONGODB_URI="mongodb://ecommerce-mongodb:27017/ecommerce?replicaSet=rs0" \
-    -e SERVER_PORT="8080" \
-    -v "$PROJECT_DIR/backend:/app:Z" \
-    "$API_IMAGE" \
-    sh -c "if [ -f ./mvnw ]; then ./mvnw spring-boot:run; else echo 'Ambiente Java 21 (ecommerce-api) pronto aguardando criação das APIs...'; tail -f /dev/null; fi"
+  echo "Banco 'ecommerce' já populado ($PRODUCTS_COUNT produtos ativos)."
 fi
+
+# 5. Criar ou atualizar o container da API Java (Spring Boot) conectado ao MongoDB
+mkdir -p "$PROJECT_DIR/backend" "$PROJECT_DIR/tests"
+echo "[5/5] Subindo container '$API_CONTAINER' (Spring Boot + Java 21) na porta 8080..."
+podman rm -f "$API_CONTAINER" >/dev/null 2>&1 || true
+podman run -d \
+  --name "$API_CONTAINER" \
+  --network host \
+  -w /app \
+  -e SPRING_DATA_MONGODB_URI="mongodb://localhost:27017/ecommerce?replicaSet=rs0&directConnection=true" \
+  -e SERVER_PORT="8080" \
+  -v "$PROJECT_DIR/backend:/app:Z" \
+  -v "$PROJECT_DIR/tests:/tests:Z" \
+  -v "$API_MAVEN_VOLUME:/root/.m2:Z" \
+  "$API_IMAGE" \
+  sh -c "apk add --no-cache maven >/dev/null 2>&1 || true; if [ -f ./pom.xml ]; then mvn spring-boot:run; else echo 'Ambiente Java 21 (ecommerce-api) pronto...'; tail -f /dev/null; fi"
+
+echo "Aguardando API Spring Boot iniciar na porta 8080..."
+for i in {1..30}; do
+  if curl -sf http://localhost:8080/api/v1/status >/dev/null 2>&1; then
+    echo "API conectada ao MongoDB com sucesso:"
+    curl -s http://localhost:8080/api/v1/status
+    echo ""
+    break
+  fi
+  sleep 1
+done
 
 echo "Ambientes Podman prontos:"
 echo "  - MongoDB: mongodb://localhost:27017/ecommerce?replicaSet=rs0"
-echo "  - API Container (Java 21):ecommerce-api rodando na porta 8080"
+echo "  - API Spring Boot: http://localhost:8080/api/v1/status"
